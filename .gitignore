@@ -1,0 +1,21 @@
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+data/
+logs/
+*.log
+.idea/
+*.iml
+.DS_Store
+# 에이전트/개인 로컬 파일 — public 배포 대상 제외
+AGENTS.md
+CLAUDE.md
+.claude/
+.CLAUDE/
+.agents/
+.codex/
+# 로컬 시크릿(웹훅 URL 등) — 절대 커밋 금지
+application-local.yml
+application.yml
+!src/main/resources/application.yml
+!src/test/resources/application.yml

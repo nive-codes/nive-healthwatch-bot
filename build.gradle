@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.nive'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+}
+
+configurations {
+    compileOnly { extendsFrom annotationProcessor }
+}
+
+repositories { mavenCentral() }
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter'          // 코어(웹 없음)
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-json'     // ObjectMapper
+    implementation 'org.springframework.boot:spring-boot-starter-mail'     // 메일(주력 채널) 발송
+    runtimeOnly 'com.h2database:h2'                                         // 내장 DB(관측 데이터)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') { useJUnitPlatform() }
+tasks.withType(JavaCompile) { options.compilerArgs += '-parameters' }
+
+// 배포 JAR 에는 로컬 시크릿 yml 미포함(웹훅 URL 유출 방지) — 실행 폴더의 ./application.yml 또는 env 로 설정
+bootJar { exclude 'application*.yml' }

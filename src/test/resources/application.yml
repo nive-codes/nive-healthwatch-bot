@@ -1,0 +1,26 @@
+# 테스트용 — 인메모리 H2 로 격리, 외부 발송/호출 없음
+spring:
+  datasource:
+    url: jdbc:h2:mem:healthwatch-test;MODE=MariaDB;DB_CLOSE_DELAY=-1;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/h2/ddl.sql
+  mail:
+    host: localhost                     # JavaMailSender 빈 생성용(실제 발송은 안 함)
+    port: 25
+
+health-watch:
+  services: []                          # 테스트에선 시딩 없음(수집 루프 외부 호출 방지)
+  ai:
+    enabled: false
+  daily-report-use-llm: false
+  notifier:
+    mail:
+      enabled: false
+    slack:
+      enabled: false
+    discord:
+      enabled: false
+    telegram:
+      enabled: false

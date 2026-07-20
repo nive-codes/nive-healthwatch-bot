@@ -1,0 +1,124 @@
+# =========================================================
+# Health Watch Bot - packaged default application.yml
+# 실제 운영 시에는 루트 ./application.yml 또는 env 로 이 값을 override 한다.
+# 시크릿(SMTP 비밀번호/토큰/암호화 키)은 이 파일에 직접 넣지 않는다.
+# =========================================================
+spring:
+  main:
+    web-application-type: none          # 웹 서버를 띄우지 않고 scheduler/메일 발송 프로세스로만 실행한다.
+  datasource:
+    driver-class-name: org.h2.Driver    # 내장 파일 DB 로 H2 를 사용한다.
+    url: jdbc:h2:file:${HW_DB_PATH:~/health-watch-bot};MODE=MariaDB;AUTO_SERVER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE # DB 파일 위치. 기본 ~/health-watch-bot.mv.db.
+    username: ${DB_USERNAME:sa}         # H2 접속 사용자. 기본 sa.
+    password: ${DB_PASSWORD:}           # H2 접속 비밀번호. 기본 빈 값.
+  sql:
+    init:
+      mode: always                      # 앱 시작 시 ddl.sql 을 항상 적용한다(CREATE IF NOT EXISTS 중심).
+      schema-locations: classpath:db/h2/ddl.sql # 테이블 생성 DDL 위치.
+      continue-on-error: false          # DDL 실패 시 조용히 넘어가지 않고 부팅 실패 처리한다.
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect # Hibernate H2 dialect.
+    hibernate:
+      ddl-auto: none                    # JPA 자동 DDL 금지. ddl.sql 이 스키마의 기준이다.
+    open-in-view: false                 # 웹 앱이 아니므로 OSIV 비활성화.
+    properties:
+      hibernate:
+        format_sql: false               # 운영 로그가 길어지지 않도록 SQL pretty print 비활성.
+  jackson:
+    time-zone: Asia/Seoul               # JSON 시간대 기준.
+  mail:
+    host: ${SMTP_HOST:localhost}        # SMTP 서버 호스트. 실제 운영은 env/루트 yml 로 override.
+    port: ${SMTP_PORT:25}               # SMTP 포트. 기본 25.
+    username: ${SMTP_USERNAME:}         # SMTP 로그인 계정. 기본 빈 값.
+    password: ${SMTP_PASSWORD:}         # SMTP 비밀번호. 기본 빈 값.
+    properties:
+      mail:
+        smtp:
+          auth: ${SMTP_AUTH:false}      # SMTP 인증 사용 여부.
+          starttls:
+            enable: ${SMTP_STARTTLS:false} # STARTTLS 사용 여부.
+
+logging:
+  level:
+    root: info                          # 기본 로그 레벨.
+  file:
+    name: logs/health-watch-bot.log     # 파일 로그 경로.
+
+health-watch:
+  collect-interval-seconds: 60          # 수집 주기. enabled=true 서비스마다 /health, /health/detail 을 호출한다.
+  request-timeout-seconds: 10           # health endpoint HTTP timeout. 무거운 /health/detail 순간지연 흡수 위해 10s.
+  analysis-window-minutes: 20           # rule 이 최근 DB latency baseline 을 계산할 때 보는 기간.
+  alert-cooldown-minutes: 10            # warning 알림 재발송 최소 간격.
+  critical-cooldown-minutes: 5          # critical 알림 재발송 최소 간격.
+  daily-report-cron: "0 0 17 * * *"     # 정기 리포트 발송 시각. 매일 17:00 KST.
+  daily-report-use-llm: true            # 정기 리포트 본문 생성에 LLM 사용. 실패 시 rule 기반 폴백.
+  daily-report-send-on-start: false     # true 면 앱 기동 직후 정기 리포트 형식을 1회 강제 발송한다.
+  startup-notification-enabled: true    # 앱 기동 완료 후 MAIN 메일 수신자에게 기동 검증 메일을 1회 발송한다.
+  first-collect-report-enabled: true    # 첫 수집 루프 완료 후 수집 결과 검증 메일을 1회 발송한다.
+  retention-cron: "0 30 4 * * *"        # 오래된 snapshot/report/log 정리 시각. 매일 04:30 KST.
+
+  crypto:
+    secret-key: ${HW_CRYPTO_KEY:}       # base64 32B AES-GCM 키. 미설정 시 webhook 등 준시크릿은 평문 저장 경고.
+
+  healthcheck-token-header: ${HEALTHCHECK_TOKEN_HEADER:Healthcheck-Token} # 대상 API healthcheck 인증 헤더명.
+  services:                             # monitored_service 테이블이 비어 있을 때만 DB 로 최초 시딩된다.
+    - name: service-a-api               # DB/메일에 표시될 서비스명.
+      base-url: ${USER_API_BASE_URL:https://service-a.example.com} # UserAPI base URL. /health 는 코드가 뒤에 붙인다.
+      profile: USER_API                 # 토큰 매칭/분류용 profile.
+      enabled: true                     # true 면 수집 대상에 포함.
+      alert-email: ${USER_API_ALERT_EMAIL:service-a-team@example.com} # 최초 시딩 시 MAIN 메일 수신자로 저장.
+      healthcheck-token: ${USER_API_HEALTHCHECK_TOKEN:} # health 호출용 토큰. DB 저장 안 함.
+    - name: service-b-api               # DB/메일에 표시될 AdminAPI 서비스명.
+      base-url: ${ADMIN_API_BASE_URL:https://service-b.example.com} # AdminAPI base URL.
+      profile: ADMIN_API                # AdminAPI profile.
+      enabled: true                     # true 면 수집 대상에 포함.
+      alert-email: ${ADMIN_API_ALERT_EMAIL:service-b-team@example.com} # AdminAPI MAIN 메일 수신자.
+      healthcheck-token: ${ADMIN_API_HEALTHCHECK_TOKEN:} # AdminAPI health token.
+    - name: service-c-api               # DB/메일에 표시될 DriverAPI 서비스명.
+      base-url: ${DRIVER_API_BASE_URL:https://service-c.example.com} # DriverAPI base URL.
+      profile: DRIVER_API               # DriverAPI profile.
+      enabled: true                     # true 면 수집 대상에 포함.
+      alert-email: ${DRIVER_API_ALERT_EMAIL:service-c-team@example.com} # DriverAPI MAIN 메일 수신자.
+      healthcheck-token: ${DRIVER_API_HEALTHCHECK_TOKEN:} # DriverAPI health token.
+
+  ai:
+    enabled: true                       # 장애 알림/정기 리포트에 LLM 분석을 붙일지 여부.
+    timeout-seconds: 90                 # LLM CLI subprocess 최대 대기 시간.
+    max-output-chars: 20000             # LLM 응답 저장/메일 반영 최대 문자 수.
+    max-concurrent: 1                   # 동시에 실행할 LLM 분석 수.
+    reanalyze-cooldown-minutes: 30      # 같은 이벤트 재분석 최소 간격.
+    command:                            # Codex 예시. 마지막 인자로 prompt 가 자동 추가된다.
+      - codex                           # LLM CLI 실행 파일.
+      - exec                            # codex 비대화 실행 모드.
+      - --json                          # codex JSON 출력 모드.
+    # Claude 인증 서버에서는 위 command 대신 아래처럼 변경:
+    # command:
+    #   - claude
+    #   - -p
+
+  rule:
+    error-rate-threshold-percent: 5.0   # api.errorRate5m 은 percent 단위로 해석한다. 1.32 = 1.32%, 임계 5%.
+    p95-latency-threshold-ms: 1000      # p95 latency warning 임계값.
+    db-latency-spike-mult: 3.0          # DB latency 가 baseline 대비 몇 배 이상이면 spike 로 볼지.
+    db-latency-min-ms: 100              # baseline 이 너무 작을 때 생기는 DB latency 오탐 방지 최소값.
+    timeout-consecutive-threshold: 2    # timeout 이 연속 N회일 때만 critical 알림. 단발 지연 오탐 방지.
+
+  notifier:
+    mail:
+      enabled: true                     # 메일 채널 활성화 여부.
+      from: ${MAIL_FROM:health-watch@localhost} # 메일 From 주소. SMTP 계정과 일치시키는 것을 권장.
+      subject-prefix: "[health-watch] " # 모든 메일 제목 앞에 붙는 prefix.
+      suppress-after-hour: ${MAIL_SUPPRESS_AFTER_HOUR:18} # KST 기준 이 시각부터 메일 발송 차단. 18이면 18:00 이후 차단, -1이면 제한 없음.
+    slack:
+      enabled: ${SLACK_ENABLED:true}    # true 면 DB 에 등록된 SLACK sender 로도 발송한다.
+    discord:
+      enabled: ${DISCORD_ENABLED:true}  # true 면 DB 에 등록된 DISCORD sender 로도 발송한다.
+    telegram:
+      enabled: ${TELEGRAM_ENABLED:true} # true 면 DB 에 등록된 TELEGRAM sender 로도 발송한다.
+
+  retention:
+    health-snapshot-days: 7             # health_snapshot 보관 일수.
+    health-db-snapshot-days: 7          # health_db_snapshot 보관 일수.
+    anomaly-event-days: 30              # anomaly_event 보관 일수.
+    ai-report-days: 30                  # ai_report 보관 일수.
+    notification-log-days: 30           # notification_log 보관 일수.
